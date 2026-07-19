@@ -27,7 +27,7 @@ case "$CURRENT_PROFILE" in
   *) fail "The outer Podman container must use --security-opt apparmor=unconfined" ;;
 esac
 
-for command_name in aa-exec apparmor_parser incus incusd lxcfs newgidmap newuidmap nft; do
+for command_name in aa-exec apparmor_parser criu incus incusd lxcfs newgidmap newuidmap nft; do
   require_command "$command_name"
 done
 

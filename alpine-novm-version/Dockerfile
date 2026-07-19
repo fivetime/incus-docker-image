@@ -18,6 +18,37 @@ RUN git clone https://github.com/canonical/lxd-ui.git . \
     && yarn install --frozen-lockfile \
     && yarn build
 
+FROM alpine:${ALPINE_VERSION} AS criu
+
+ARG CRIU_COMMIT=b7bdc14736b1e8598f2ffbb371f42318835a111f
+
+RUN apk add --no-cache \
+      bash \
+      build-base \
+      coreutils \
+      e2fsprogs \
+      elfutils-dev \
+      git \
+      gnutls-dev \
+      iproute2 \
+      libaio-dev \
+      libbsd-dev \
+      libcap-dev \
+      libnet-dev \
+      libnl3-dev \
+      lz4-dev \
+      nftables-dev \
+      pkgconfig \
+      protobuf-c-compiler \
+      protobuf-c-dev \
+      protobuf-dev \
+      python3 \
+      util-linux-dev \
+    && git clone --filter=blob:none https://github.com/checkpoint-restore/criu.git /build/criu \
+    && git -C /build/criu checkout --detach "${CRIU_COMMIT}" \
+    && make -C /build/criu -j"$(nproc)" criu WERROR=0 \
+    && /build/criu/criu/criu --version
+
 FROM alpine:${ALPINE_VERSION}
 
 RUN apk add --no-cache \
@@ -33,13 +64,19 @@ RUN apk add --no-cache \
       dnsmasq \
       e2fsprogs \
       e2fsprogs-extra \
+      gnutls \
       incus-feature \
       incus-feature-client \
       iproute2 \
       iptables \
+      libbsd \
+      libnet \
+      libnl3 \
       lvm2 \
       lxcfs \
+      lz4-libs \
       nftables \
+      protobuf-c \
       rsync \
       shadow-subids \
       squashfs-tools \
@@ -59,6 +96,7 @@ RUN apk add --no-cache --virtual .aa-exec-build build-base libapparmor-dev \
     && apk del .aa-exec-build
 
 COPY --from=ui /build/incus-ui-canonical/build/ui/ /opt/incus/ui-canonical/
+COPY --from=criu /build/criu/criu/criu /usr/local/sbin/criu
 COPY start.sh healthcheck.sh /usr/local/sbin/
 RUN chmod 0755 /usr/local/sbin/start.sh /usr/local/sbin/healthcheck.sh
 

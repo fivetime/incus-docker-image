@@ -145,9 +145,12 @@ jobs:
             ./alpine-novm-version/
           docker run --rm --entrypoint sh incus-alpine-novm-test -ec '
             command -v incusd
+            command -v criu
             command -v rbd
             command -v lvm
             losetup --version
+            criu --version
+            ! ldd /usr/local/sbin/criu | grep -q "not found"
             incusd --version
           '
 
