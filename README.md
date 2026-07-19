@@ -125,6 +125,86 @@ echo "vhost_vsock" > /etc/modules-load.d/incus.conf
 echo "kvm" >> /etc/modules-load.d/incus.conf
 ```
 
+## Hardened Alpine system-container image
+
+The `alpine-novm` image is intended for unprivileged Incus system containers. It does not include QEMU, OVMF, or the Incus VM package. It requires a rootful Podman host with cgroup v2, seccomp, and AppArmor enabled. The entrypoint fails instead of starting Incus when those security prerequisites or subordinate ID tools are unavailable.
+
+Run it with:
+
+```bash
+sudo mkdir -p /var/lib/incus
+
+sudo podman run -d \
+  --name incus \
+  --restart unless-stopped \
+  --stop-timeout 60 \
+  --cgroups=no-conmon \
+  --cgroupns=host \
+  --security-opt unmask=/sys/fs/cgroup \
+  --security-opt apparmor=unconfined \
+  --privileged \
+  --network host \
+  --pid=host \
+  --volume /dev:/dev \
+  --volume /var/lib/incus:/var/lib/incus \
+  --volume /lib/modules:/lib/modules:ro \
+  --volume /sys/kernel/security:/sys/kernel/security \
+  --volume /etc/ceph:/etc/ceph:ro \
+  ghcr.io/OWNER/REPOSITORY:alpine-novm
+```
+
+`/var/lib/incus` is the persistent state directory. Keep it on durable host storage even when the outer Podman container is replaced. Packages and other changes made inside an Incus instance survive instance and Podman restarts because the instance root disk is stored there. The 60-second stop timeout gives Incus time to shut instances down cleanly.
+
+The image includes the Ceph client tools required by the Incus `ceph` and `cephfs` storage drivers. The `/etc/ceph` mount is only needed when using an existing external Ceph cluster; it supplies that cluster's configuration and a least-privilege Incus keyring. Do not expose the keyring to tenants. Create the storage pool with the values for your cluster, for example:
+
+```bash
+incus storage create ceph-pool ceph \
+  source=incus \
+  ceph.cluster_name=ceph \
+  ceph.user.name=incus
+```
+
+Use the Ceph pool for a new instance root disk by setting the project's default profile or by supplying `--storage ceph-pool` at launch. A local `dir`, Btrfs, or LVM pool is also persistent and is sufficient for a single Incus server; Ceph is useful when the root disks must live on shared, replicated cluster storage. Protect pet-style instances from accidental deletion and take scheduled snapshots or exports, because Ceph replication is not a backup:
+
+```bash
+incus config set INSTANCE security.protection.delete=true
+incus snapshot create INSTANCE scheduled-backup
+```
+
+The outer Podman container is packaging, not a security boundary. It is deliberately unconfined so Incus can load a separate AppArmor profile for every instance. Do not give tenants access to Podman, the Incus Unix socket, an administrator certificate, or the host.
+
+Use a restricted project for each tenant. The following baseline blocks privileged and nested containers, low-level LXC configuration, syscall interception, sensitive devices, and access to networks other than the tenant network:
+
+```bash
+incus project create tenant-a \
+  -c restricted=true \
+  -c features.profiles=true \
+  -c features.images=false \
+  -c restricted.containers.privilege=unprivileged \
+  -c restricted.containers.nesting=block \
+  -c restricted.containers.lowlevel=block \
+  -c restricted.containers.interception=block \
+  -c restricted.devices.unix-char=block \
+  -c restricted.devices.unix-block=block \
+  -c restricted.devices.gpu=block \
+  -c restricted.devices.pci=block \
+  -c restricted.devices.proxy=block \
+  -c restricted.networks.access=tenant-a
+```
+
+Set these options on every tenant container, along with workload-specific CPU, memory, process, and storage limits:
+
+```bash
+incus config set INSTANCE security.privileged=false
+incus config set INSTANCE security.idmap.isolated=true
+incus config set INSTANCE security.nesting=false
+incus config set INSTANCE limits.cpu=2
+incus config set INSTANCE limits.memory=4GiB
+incus config set INSTANCE limits.processes=4096
+```
+
+Before admitting tenants, verify that `aa-status` shows each `incus-INSTANCE_</var/lib/incus>` profile in enforce mode and that `/proc/1/status` inside an instance reports `Seccomp: 2`.
+
 # Management
 
 After you start the container, incus will be running. If you used the folder I suggested and used host networking, you can manage it immediately with the incus binary from the same machine. Grab the binary from the latest releases here:

@@ -1,62 +1,72 @@
-# Stage 1 to build the UI
-FROM alpine:edge AS ui
+# syntax=docker/dockerfile:1
 
-# Set the working directory
+ARG ALPINE_VERSION=edge
+
+FROM --platform=$BUILDPLATFORM alpine:${ALPINE_VERSION} AS ui
+
+ARG INCUS_UI_COMMIT=7752cfdacfdab5b7bc7c5d749c728debe089f8cc
+
+RUN apk add --no-cache git nodejs npm yarn
 WORKDIR /build/incus-ui-canonical
-
-# Install git and other necessary tools
-RUN apk add --no-cache git rsync
-
-# Add the Alpine/Edge testing repository
-RUN echo "https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
-
-# Clone the LXD-UI repository
-RUN git clone https://github.com/canonical/lxd-ui.git /build/incus-ui-canonical
-
-# Apply specific tweaks
-RUN sed -i "s/LXD/Incus/g" src/*/*.ts* src/*/*/*.ts* src/*/*/*/*.ts* \
+RUN git clone https://github.com/canonical/lxd-ui.git . \
+    && git checkout --detach "${INCUS_UI_COMMIT}" \
+    && sed -i "s/LXD/Incus/g" src/*/*.ts* src/*/*/*.ts* src/*/*/*/*.ts* \
     && sed -i "s/devlxd/guestapi/g" src/*/*.ts* src/*/*/*.ts* src/*/*/*/*.ts* \
     && sed -i "s/dev\/lxd/dev\/incus/g" src/*/*.ts* src/*/*/*.ts* src/*/*/*/*.ts* \
     && sed -i "s/lxd_/incus_/g" src/*/*.ts* src/*/*/*.ts* src/*/*/*/*.ts* \
-    && sed -i "s/\"lxd\"/\"incus\"/g" src/*/*.ts* src/*/*/*.ts* src/*/*/*/*.ts*
-
-# Build the UI
-RUN apk add --no-cache nodejs npm \
-    && npm install yarn --global \
-    && yarn install \
+    && sed -i "s/\"lxd\"/\"incus\"/g" src/*/*.ts* src/*/*/*.ts* src/*/*/*/*.ts* \
+    && yarn install --frozen-lockfile \
     && yarn build
 
-# Create the target directory for UI files
-RUN mkdir -p /opt/incus/ui-canonical/
+FROM alpine:${ALPINE_VERSION}
 
-# Copy the built UI files to the target directory
-RUN rsync -a /build/incus-ui-canonical/build/ui/ /opt/incus/ui-canonical/
+RUN apk add --no-cache \
+      acl \
+      apparmor \
+      apparmor-profiles-abstractions \
+      apparmor-profiles-tunables \
+      apparmor-utils \
+      attr \
+      btrfs-progs \
+      ceph19-common \
+      ceph19-mount \
+      dnsmasq \
+      e2fsprogs \
+      e2fsprogs-extra \
+      incus-feature \
+      incus-feature-client \
+      iproute2 \
+      iptables \
+      lvm2 \
+      lxcfs \
+      nftables \
+      rsync \
+      shadow-subids \
+      squashfs-tools \
+      thin-provisioning-tools \
+      util-linux \
+      util-linux-misc \
+      xz \
+    && printf '%s\n' 'root:1000000:1000000000' > /etc/subuid \
+    && printf '%s\n' 'root:1000000:1000000000' > /etc/subgid \
+    && mkdir -p /opt/incus/ui-canonical /var/lib/incus-lxcfs /var/log/incus
 
-#Stage 2: Create the container
-FROM alpine:edge
-COPY --from=ui /opt/incus/ui-canonical /opt/incus/ui-canonical
+COPY aa-exec.c /tmp/aa-exec.c
+RUN apk add --no-cache --virtual .aa-exec-build build-base libapparmor-dev \
+    && cc -O2 -Wall -Wextra /tmp/aa-exec.c -lapparmor -o /usr/local/bin/aa-exec \
+    && strip /usr/local/bin/aa-exec \
+    && rm /tmp/aa-exec.c \
+    && apk del .aa-exec-build
 
-# Install the required packages
-RUN echo "https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && \
-    apk add --no-cache \
-    incus \
-    incus-client \
-    btrfs-progs \
-    iptables-legacy \
-    zfs && \
-    echo '#!/bin/sh' > /start.sh && \
-    echo 'export INCUS_UI="/opt/incus/ui-canonical/"' >> /start.sh && \
-    echo 'if [ "$SETIPTABLES" = "true" ]; then' >> /start.sh && \
-    echo 'if ! iptables-legacy -C DOCKER-USER -j ACCEPT &>/dev/null; then' >> /start.sh && \
-    echo 'iptables-legacy -I DOCKER-USER -j ACCEPT' >> /start.sh && \
-    echo 'fi' >> /start.sh && \
-    echo 'if ! ip6tables-legacy -C DOCKER-USER -j ACCEPT &>/dev/null; then' >> /start.sh && \
-    echo 'ip6tables-legacy -I DOCKER-USER -j ACCEPT' >> /start.sh && \
-    echo 'fi' >> /start.sh && \
-    echo 'fi' >> /start.sh && \
-    echo 'incusd' >> /start.sh && \
-    chmod +x /start.sh
+COPY --from=ui /build/incus-ui-canonical/build/ui/ /opt/incus/ui-canonical/
+COPY start.sh healthcheck.sh /usr/local/sbin/
+RUN chmod 0755 /usr/local/sbin/start.sh /usr/local/sbin/healthcheck.sh
 
+ENV INCUS_UI=/opt/incus/ui-canonical/
 
-# Start the service
-CMD /start.sh
+VOLUME ["/var/lib/incus"]
+STOPSIGNAL SIGPWR
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD ["/usr/local/sbin/healthcheck.sh"]
+
+ENTRYPOINT ["/usr/local/sbin/start.sh"]

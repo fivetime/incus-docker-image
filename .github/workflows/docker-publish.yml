@@ -37,7 +37,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer
@@ -46,6 +46,9 @@ jobs:
         uses: sigstore/cosign-installer@6e04d228eb30da1757ee4e1dd75a0ec73a653e06 #v3.1.1
         with:
           cosign-release: 'v2.1.1'
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
 
       # Set up BuildKit Docker container builder to be able to build
       # multi-platform images and export cache
@@ -99,3 +102,60 @@ jobs:
       #  # This step uses the identity token to provision an ephemeral certificate
       #  # against the sigstore community Fulcio instance.
       #  run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+
+  build-alpine-novm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3.0.0
+
+      - name: Log into registry ${{ env.REGISTRY }}
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Alpine no-VM metadata
+        id: meta-alpine-novm
+        uses: docker/metadata-action@96383f45573cb7f253c731d3b3ab81c87ef81934 # v5.0.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=alpine-novm
+            type=sha,prefix=alpine-novm-
+
+      - name: Validate Alpine no-VM runtime tools
+        run: |
+          docker buildx build \
+            --load \
+            --platform linux/amd64 \
+            --tag incus-alpine-novm-test \
+            ./alpine-novm-version/
+          docker run --rm --entrypoint sh incus-alpine-novm-test -ec '
+            command -v incusd
+            command -v rbd
+            command -v lvm
+            losetup --version
+            incusd --version
+          '
+
+      - name: Build and push Alpine no-VM image
+        uses: docker/build-push-action@0565240e2d4ab88bba5387d719585280857ece09 # v5.0.0
+        with:
+          context: ./alpine-novm-version/
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta-alpine-novm.outputs.tags }}
+          labels: ${{ steps.meta-alpine-novm.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
