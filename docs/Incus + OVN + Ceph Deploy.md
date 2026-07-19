@@ -260,7 +260,7 @@ ContainerName=incus
 Network=host
 Environment=INCUS_SOCKET_GID=REPLACE_WITH_HOST_INCUS_ADMIN_GID
 Volume=/dev:/dev
-Volume=/var/lib/incus:/var/lib/incus
+Volume=/var/lib/incus:/var/lib/incus:rshared
 Volume=/run/incus-podman:/run/incus:rshared
 Volume=/lib/modules:/lib/modules:ro
 Volume=/sys/kernel/security:/sys/kernel/security
