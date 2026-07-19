@@ -146,6 +146,7 @@ RUN apk add --no-cache \
       rsync \
       shadow-subids \
       squashfs-tools \
+      tar \
       thin-provisioning-tools \
       util-linux \
       util-linux-misc \
@@ -174,6 +175,7 @@ COPY start.sh healthcheck.sh /usr/local/sbin/
 RUN chmod 0755 /usr/local/sbin/start.sh /usr/local/sbin/healthcheck.sh \
     && test "$(incusd --version)" = "7.2" \
     && criu --version \
+    && tar --help 2>&1 | grep -q -- "--no-unquote" \
     && ! ldd /usr/sbin/incusd | grep -q "not found" \
     && ! ldd /usr/local/sbin/criu | grep -q "not found"
 

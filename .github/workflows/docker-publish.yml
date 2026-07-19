@@ -156,6 +156,7 @@ jobs:
             command -v criu
             command -v rbd
             command -v lvm
+            tar --help 2>&1 | grep -q -- "--no-unquote"
             losetup --version
             criu --version
             ! ldd /usr/local/sbin/criu | grep -q "not found"
