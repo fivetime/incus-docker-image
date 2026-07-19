@@ -38,6 +38,7 @@ RUN apk add --no-cache \
       libnl3-dev \
       lz4-dev \
       nftables-dev \
+      perl \
       pkgconfig \
       protobuf-c-compiler \
       protobuf-c-dev \
