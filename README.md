@@ -127,12 +127,16 @@ echo "kvm" >> /etc/modules-load.d/incus.conf
 
 ## Hardened Alpine system-container image
 
-The `alpine-novm` image is intended for unprivileged Incus system containers. It does not include QEMU, OVMF, or the Incus VM package. It requires a rootful Podman host with cgroup v2, seccomp, and AppArmor enabled. The entrypoint fails instead of starting Incus when those security prerequisites or subordinate ID tools are unavailable.
+The `alpine-novm` image is intended for unprivileged Incus system containers. It compiles the pinned `fivetime/incus` fork revision recorded in the OCI `org.opencontainers.image.revision` label; it does not install Alpine's Incus daemon package. The image also carries the pinned CRIU and liblxc fixes required by the tested stateful-migration path. It does not include QEMU or OVMF.
+
+It requires rootful Podman, cgroup v2, seccomp, AppArmor, a host UTS namespace, a persistent `/run/incus` bind mount, and recursive shared propagation for `/var/lib/incus`. The entrypoint fails instead of starting Incus when these prerequisites or subordinate ID tools are unavailable.
 
 Run it with:
 
 ```bash
-sudo mkdir -p /var/lib/incus
+sudo mkdir -p /var/lib/incus /run/incus-podman
+sudo mount --bind /var/lib/incus /var/lib/incus
+sudo mount --make-rshared /var/lib/incus
 
 sudo podman run -d \
   --name incus \
@@ -145,8 +149,10 @@ sudo podman run -d \
   --privileged \
   --network host \
   --pid=host \
+  --uts=host \
   --volume /dev:/dev \
-  --volume /var/lib/incus:/var/lib/incus \
+  --volume /var/lib/incus:/var/lib/incus:rshared \
+  --volume /run/incus-podman:/run/incus:rshared \
   --volume /lib/modules:/lib/modules:ro \
   --volume /sys/kernel/security:/sys/kernel/security \
   --volume /etc/ceph:/etc/ceph:ro \
@@ -154,6 +160,8 @@ sudo podman run -d \
 ```
 
 `/var/lib/incus` is the persistent state directory. Keep it on durable host storage even when the outer Podman container is replaced. Packages and other changes made inside an Incus instance survive instance and Podman restarts because the instance root disk is stored there. The 60-second stop timeout gives Incus time to shut instances down cleanly.
+
+`/run/incus` must also be a host bind mount so mount namespace state remains reachable while the outer Podman container is restarted. Sharing the host UTS namespace prevents CRIU from encountering an unsupported nested UTS namespace; tenant containers still receive their own UTS namespaces from Incus.
 
 The image includes the Ceph client tools required by the Incus `ceph` and `cephfs` storage drivers. The `/etc/ceph` mount is only needed when using an existing external Ceph cluster; it supplies that cluster's configuration and a least-privilege Incus keyring. Do not expose the keyring to tenants. Create the storage pool with the values for your cluster, for example:
 

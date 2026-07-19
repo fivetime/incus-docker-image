@@ -267,7 +267,7 @@ Volume=/sys/kernel/security:/sys/kernel/security
 Volume=/etc/ceph:/etc/ceph:ro
 Volume=/run/openvswitch:/run/openvswitch
 Volume=/run/udev:/run/udev:ro
-PodmanArgs=--cgroups=no-conmon --cgroupns=host --security-opt=unmask=/sys/fs/cgroup --security-opt=apparmor=unconfined --privileged --pid=host --stop-timeout=60
+PodmanArgs=--cgroups=no-conmon --cgroupns=host --security-opt=unmask=/sys/fs/cgroup --security-opt=apparmor=unconfined --privileged --pid=host --uts=host --stop-timeout=60
 
 [Service]
 Restart=always
@@ -304,6 +304,23 @@ systemctl is-enabled incus.service
 ```
 
 Quadlet 的 `[Install]` 段负责建立开机启动关系。不要对 generator 生成的 service 执行 `systemctl enable`；修改 `.container` 后应执行 `daemon-reload` 和 `restart`。
+
+`--uts=host` 是 CRIU 热迁移系统容器的必要条件。若 Incus daemon
+运行在 Podman 私有 UTS namespace 中，租户容器会形成嵌套 UTS
+namespace，CRIU 将以 `Can't dump nested uts namespace` 拒绝转储。这里共享
+UTS namespace 的是受信任的 Incus 服务容器，不是租户系统容器；租户容器
+仍由 Incus 创建独立 UTS namespace。由于 Incus 服务容器本身具有
+`--privileged`，只有平台管理员可以修改 Quadlet、镜像和进入该服务容器。
+
+启用后应确认 Podman 和宿主看到同一个 UTS namespace：
+
+```bash
+podman inspect incus --format '{{.HostConfig.UTSMode}}'
+podman exec incus sh -c 'readlink /proc/self/ns/uts'
+readlink /proc/self/ns/uts
+```
+
+第一条必须输出 `host`，后两条 inode 必须相同。
 
 `systemctl is-enabled incus.service` 在 Quadlet 下正常输出通常是 `generated`。如果 service 显示 `not-found`，执行以下诊断：
 

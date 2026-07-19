@@ -21,6 +21,8 @@ env:
   REGISTRY: ghcr.io
   # github.repository as <account>/<repo>
   IMAGE_NAME: ${{ github.repository }}
+  # This is the audited Incus fork revision compiled into alpine-novm.
+  INCUS_COMMIT: 84ce0c64f3bb748c7a5c8c020679ef5218f7453d
 
 
 
@@ -135,12 +137,18 @@ jobs:
           tags: |
             type=raw,value=alpine-novm
             type=sha,prefix=alpine-novm-
+          labels: |
+            org.opencontainers.image.source=https://github.com/fivetime/incus
+            org.opencontainers.image.revision=${{ env.INCUS_COMMIT }}
+            io.github.fivetime.image.revision=${{ github.sha }}
+            io.github.fivetime.incus.variant=alpine-novm
 
       - name: Validate Alpine no-VM runtime tools
         run: |
           docker buildx build \
             --load \
             --platform linux/amd64 \
+            --build-arg INCUS_COMMIT=${INCUS_COMMIT} \
             --tag incus-alpine-novm-test \
             ./alpine-novm-version/
           docker run --rm --entrypoint sh incus-alpine-novm-test -ec '
@@ -151,13 +159,19 @@ jobs:
             losetup --version
             criu --version
             ! ldd /usr/local/sbin/criu | grep -q "not found"
-            incusd --version
+            ! ldd /usr/lib/liblxc.so.1.9.0 | grep -q "not found"
+            strings /usr/lib/liblxc.so.1.9.0 | grep -q "apparmor"
+            test "$(incusd --version)" = "7.2"
+            test "$(incus --version)" = "7.2"
+            test "$(incusd --help 2>&1 | head -n 1)" != ""
           '
 
       - name: Build and push Alpine no-VM image
         uses: docker/build-push-action@0565240e2d4ab88bba5387d719585280857ece09 # v5.0.0
         with:
           context: ./alpine-novm-version/
+          build-args: |
+            INCUS_COMMIT=${{ env.INCUS_COMMIT }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta-alpine-novm.outputs.tags }}
           labels: ${{ steps.meta-alpine-novm.outputs.labels }}
