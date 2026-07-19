@@ -22,7 +22,7 @@ env:
   # github.repository as <account>/<repo>
   IMAGE_NAME: ${{ github.repository }}
   # This is the audited Incus fork revision compiled into alpine-novm.
-  INCUS_COMMIT: 84ce0c64f3bb748c7a5c8c020679ef5218f7453d
+  INCUS_COMMIT: 417e7057adec9188535eb59a341d6ed7726aaab2
 
 
 
