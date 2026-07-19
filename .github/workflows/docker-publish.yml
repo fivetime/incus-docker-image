@@ -25,6 +25,8 @@ env:
   REGISTRY: ghcr.io
   # github.repository as <account>/<repo>
   IMAGE_NAME: ${{ github.repository }}
+  # Production Incus fork package consumed by the compute nodes.
+  ALPINE_IMAGE_NAME: fivetime/incus
   # This is the audited Incus fork revision compiled into alpine-novm.
   INCUS_COMMIT: 417e7057adec9188535eb59a341d6ed7726aaab2
 
@@ -172,7 +174,7 @@ jobs:
           build-args: |
             INCUS_COMMIT=${{ env.INCUS_COMMIT }}
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:alpine-novm-${{ matrix.arch }}
+          tags: ${{ env.REGISTRY }}/${{ env.ALPINE_IMAGE_NAME }}:alpine-novm-${{ matrix.arch }}
           labels: |
             org.opencontainers.image.source=https://github.com/fivetime/incus
             org.opencontainers.image.revision=${{ env.INCUS_COMMIT }}
@@ -202,7 +204,7 @@ jobs:
 
       - name: Publish multi-platform manifest
         env:
-          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          IMAGE: ${{ env.REGISTRY }}/${{ env.ALPINE_IMAGE_NAME }}
         run: |
           short_sha="${GITHUB_SHA::7}"
           docker buildx imagetools create \
