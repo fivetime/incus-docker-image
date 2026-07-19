@@ -137,6 +137,7 @@ test "$(cat /proc/sys/kernel/core_pattern)" = /dev/null
 
 ```bash
 install -d -m 0700 /var/lib/incus
+install -d -m 0700 /run/incus-podman
 install -d -m 0755 /etc/ceph
 ```
 
@@ -260,6 +261,7 @@ Network=host
 Environment=INCUS_SOCKET_GID=REPLACE_WITH_HOST_INCUS_ADMIN_GID
 Volume=/dev:/dev
 Volume=/var/lib/incus:/var/lib/incus
+Volume=/run/incus-podman:/run/incus:rshared
 Volume=/lib/modules:/lib/modules:ro
 Volume=/sys/kernel/security:/sys/kernel/security
 Volume=/etc/ceph:/etc/ceph:ro
