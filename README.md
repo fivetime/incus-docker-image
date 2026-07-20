@@ -159,6 +159,16 @@ sudo podman run -d \
   ghcr.io/OWNER/REPOSITORY:alpine-novm
 ```
 
+For a systemd or Quadlet service, have systemd recreate the runtime bind
+directory after every boot. `/run` is a tmpfs, so a one-time `mkdir` does not
+survive a host reboot:
+
+```ini
+[Service]
+RuntimeDirectory=incus-podman
+RuntimeDirectoryMode=0700
+```
+
 `/var/lib/incus` is the persistent state directory. Keep it on durable host storage even when the outer Podman container is replaced. Packages and other changes made inside an Incus instance survive instance and Podman restarts because the instance root disk is stored there. The 60-second stop timeout gives Incus time to shut instances down cleanly.
 
 `/run/incus` must also be a host bind mount so mount namespace state remains reachable while the outer Podman container is restarted. Sharing the host UTS namespace prevents CRIU from encountering an unsupported nested UTS namespace; tenant containers still receive their own UTS namespaces from Incus.
