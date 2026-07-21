@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 ARG ALPINE_VERSION=3.24
-ARG INCUS_COMMIT=01bcffaf61cc6ae6de1a9a8f63654e68a56ac527
+ARG INCUS_COMMIT=c664a9d7edefe2d62c6500411c46c3f8ed024fa9
 
 FROM alpine:${ALPINE_VERSION} AS incus-build
 
