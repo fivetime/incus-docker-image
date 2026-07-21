@@ -268,15 +268,16 @@ Volume=/sys/kernel/security:/sys/kernel/security
 Volume=/etc/ceph:/etc/ceph:ro
 Volume=/run/openvswitch:/run/openvswitch
 Volume=/run/udev:/run/udev:ro
-PodmanArgs=--cgroups=no-conmon --cgroupns=host --security-opt=unmask=/sys/fs/cgroup --security-opt=apparmor=unconfined --privileged --pid=host --uts=host --stop-timeout=60
+PodmanArgs=--cgroups=no-conmon --cgroupns=host --security-opt=unmask=/sys/fs/cgroup --security-opt=apparmor=unconfined --privileged --pid=host --uts=host --stop-timeout=120
 
 [Service]
 Restart=always
 RestartSec=5s
 TimeoutStartSec=120
-TimeoutStopSec=75
+TimeoutStopSec=135
 RuntimeDirectory=incus-podman
 RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=restart
 ExecStartPre=/usr/bin/test -S /run/openvswitch/db.sock
 ExecStartPre=/usr/bin/test -w /sys/kernel/security/apparmor/.load
 LimitNOFILE=1048576
@@ -284,6 +285,23 @@ LimitNOFILE=1048576
 [Install]
 WantedBy=multi-user.target
 ```
+
+Quadlet 自动生成的 `ExecStop=podman rm -f` 只发送 OCI 停止信号并等待超时，不能替代
+Incus daemon 的管理关机流程。创建 systemd drop-in，先让 Incus 干净关闭实例和数据库，
+再等待外层容器退出：
+
+```bash
+install -d -m 0755 /etc/systemd/system/incus.service.d
+cat >/etc/systemd/system/incus.service.d/graceful-stop.conf <<'EOF'
+[Service]
+ExecStop=
+ExecStop=-/bin/sh -c '/usr/bin/podman exec incus incus admin shutdown --timeout 120; while /usr/bin/podman inspect -f "{{.State.Running}}" incus 2>/dev/null | grep -qx true; do sleep 1; done'
+EOF
+```
+
+`RuntimeDirectoryPreserve=restart` 同样是必须项。没有它，外层服务重启时 systemd 会清空
+宿主机的 `/run/incus-podman`，导致仍存活的 LXC 进程丢失运行时配置。不要把
+`ExecStopPre=` 写入 service；systemd 不支持该指令并会静默忽略它。
 
 生产环境应将 `Image=` 改成已经验证的不可变 digest，例如：
 
