@@ -252,7 +252,7 @@ Documentation=https://linuxcontainers.org/incus/docs/main/
 Wants=network-online.target
 After=network-online.target openvswitch-switch.service ovn-host.service
 Requires=openvswitch-switch.service ovn-host.service
-RequiresMountsFor=/var/lib/incus /etc/ceph
+RequiresMountsFor=/var/lib/incus /var/log/incus /etc/ceph
 
 [Container]
 Image=ghcr.io/fivetime/incus@sha256:REPLACE_WITH_VERIFIED_DIGEST
@@ -261,6 +261,7 @@ Network=host
 Environment=INCUS_SOCKET_GID=REPLACE_WITH_HOST_INCUS_ADMIN_GID
 Volume=/dev:/dev
 Volume=/var/lib/incus:/var/lib/incus:rshared
+Volume=/var/log/incus:/var/log/incus
 Volume=/run/incus-podman:/run/incus:rshared
 Volume=/lib/modules:/lib/modules:ro
 Volume=/sys/kernel/security:/sys/kernel/security

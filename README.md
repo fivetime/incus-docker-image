@@ -173,7 +173,14 @@ RuntimeDirectoryMode=0700
 
 `/run/incus` must also be a host bind mount so mount namespace state remains reachable while the outer Podman container is restarted. Sharing the host UTS namespace prevents CRIU from encountering an unsupported nested UTS namespace; tenant containers still receive their own UTS namespaces from Incus.
 
-The image includes the Ceph client tools required by the Incus `ceph` and `cephfs` storage drivers. The `/etc/ceph` mount is only needed when using an existing external Ceph cluster; it supplies that cluster's configuration and a least-privilege Incus keyring. Do not expose the keyring to tenants. Create the storage pool with the values for your cluster, for example:
+The image includes the Ceph client tools required by the Incus `ceph` and
+`cephfs` storage drivers, and the ZFS user-space tools required by the `zfs`
+driver. The ZFS kernel module and the named zpool remain host responsibilities;
+the outer container must not install or own a second kernel module. The
+`/etc/ceph` mount is only needed when using an existing external Ceph cluster;
+it supplies that cluster's configuration and a least-privilege Incus keyring.
+Do not expose the keyring to tenants. Create the storage pool with the values
+for your cluster, for example:
 
 ```bash
 incus storage create ceph-pool ceph \

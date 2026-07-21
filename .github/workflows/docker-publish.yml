@@ -26,7 +26,7 @@ env:
   # github.repository as <account>/<repo>
   IMAGE_NAME: ${{ github.repository }}
   # This is the audited Incus fork revision compiled into alpine-novm.
-  INCUS_COMMIT: 80ba579c257e034d049d855b9173e06c73aa7e09
+  INCUS_COMMIT: 01bcffaf61cc6ae6de1a9a8f63654e68a56ac527
 
 
 
@@ -154,6 +154,8 @@ jobs:
             command -v criu
             command -v rbd
             command -v lvm
+            command -v zfs
+            command -v zpool
             tar --help 2>&1 | grep -q -- "--no-unquote"
             losetup --version
             criu --version

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 ARG ALPINE_VERSION=3.24
-ARG INCUS_COMMIT=417e7057adec9188535eb59a341d6ed7726aaab2
+ARG INCUS_COMMIT=01bcffaf61cc6ae6de1a9a8f63654e68a56ac527
 
 FROM alpine:${ALPINE_VERSION} AS incus-build
 
@@ -151,6 +151,7 @@ RUN apk add --no-cache \
       util-linux \
       util-linux-misc \
       xz \
+      zfs \
       so:libacl.so.1 \
       so:libapparmor.so.1 \
       so:libcap.so.2 \
@@ -175,6 +176,8 @@ COPY start.sh healthcheck.sh /usr/local/sbin/
 RUN chmod 0755 /usr/local/sbin/start.sh /usr/local/sbin/healthcheck.sh \
     && test "$(incusd --version)" = "7.2" \
     && criu --version \
+    && command -v zfs \
+    && command -v zpool \
     && tar --help 2>&1 | grep -q -- "--no-unquote" \
     && ! ldd /usr/sbin/incusd | grep -q "not found" \
     && ! ldd /usr/local/sbin/criu | grep -q "not found"
