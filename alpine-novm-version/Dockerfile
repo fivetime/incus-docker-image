@@ -163,7 +163,7 @@ RUN apk add --no-cache \
       so:libuv.so.1 \
     && printf '%s\n' 'root:1000000:1000000000' > /etc/subuid \
     && printf '%s\n' 'root:1000000:1000000000' > /etc/subgid \
-    && mkdir -p /etc/criu /opt/incus/ui-canonical /var/lib/incus-lxcfs /var/log/incus \
+    && mkdir -p /etc/criu /opt/incus/ui-canonical /var/lib/lxcfs /var/log/incus \
     && printf '%s\n' 'enable-external-masters' > /etc/criu/default.conf
 
 COPY --from=incus-build /out/incusd /usr/sbin/incusd

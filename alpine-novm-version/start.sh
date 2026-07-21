@@ -47,7 +47,7 @@ done
 grep -q '^root:[0-9][0-9]*:[0-9][0-9]*$' /etc/subuid || fail "A root subordinate UID range is required"
 grep -q '^root:[0-9][0-9]*:[0-9][0-9]*$' /etc/subgid || fail "A root subordinate GID range is required"
 
-mkdir -p /usr/lib/lxc/rootfs /var/lib/incus-lxcfs /var/log/incus
+mkdir -p /usr/lib/lxc/rootfs /var/lib/lxcfs /var/log/incus
 
 DAEMON_ARGS=""
 if [ -n "${INCUS_SOCKET_GID:-}" ]; then
@@ -58,6 +58,6 @@ if [ -n "${INCUS_SOCKET_GID:-}" ]; then
   DAEMON_ARGS="--group incus-admin"
 fi
 
-lxcfs /var/lib/incus-lxcfs --enable-loadavg --enable-cfs &
+lxcfs /var/lib/lxcfs --enable-loadavg --enable-cfs &
 # shellcheck disable=SC2086
 exec incusd ${DAEMON_ARGS}
