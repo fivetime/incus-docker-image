@@ -42,6 +42,7 @@ With Podman (needs root permissions) (recommended):
 ```
 sudo podman run -d \
 --name incus \
+--log-driver=none \
 --cgroups=no-conmon \
 --cgroupns=host \
 --security-opt unmask=/sys/fs/cgroup \
@@ -141,6 +142,7 @@ sudo mount --make-rshared /var/lib/incus
 sudo podman run -d \
   --name incus \
   --restart unless-stopped \
+  --log-driver none \
   --stop-timeout 60 \
   --cgroups=no-conmon \
   --cgroupns=host \
@@ -158,6 +160,13 @@ sudo podman run -d \
   --volume /etc/ceph:/etc/ceph:ro \
   ghcr.io/OWNER/REPOSITORY:alpine-novm
 ```
+
+The Incus daemon writes its logs below `/var/log/incus` and exposes its event
+stream through the Incus API. Disable Podman's log driver for this container.
+Otherwise the daemon's stdout/stderr pipe belongs to `conmon` and can be
+inherited by long-lived LXC monitor processes. Replacing the daemon container
+then leaves the old `conmon` waiting for those guest processes to close the
+pipe, even when `daemon.live_restore` keeps the guests running correctly.
 
 For a systemd or Quadlet service, have systemd recreate the runtime bind
 directory after every boot. `/run` is a tmpfs, so a one-time `mkdir` does not

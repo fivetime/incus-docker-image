@@ -258,6 +258,7 @@ RequiresMountsFor=/var/lib/incus /var/log/incus /etc/ceph
 Image=ghcr.io/fivetime/incus@sha256:REPLACE_WITH_VERIFIED_DIGEST
 ContainerName=incus
 Network=host
+LogDriver=none
 Environment=INCUS_SOCKET_GID=REPLACE_WITH_HOST_INCUS_ADMIN_GID
 Volume=/dev:/dev
 Volume=/var/lib/incus:/var/lib/incus:rshared
@@ -308,6 +309,13 @@ EOF
 ```ini
 Image=ghcr.io/fivetime/incus@sha256:REPLACE_WITH_VERIFIED_DIGEST
 ```
+
+`LogDriver=none` is required for live daemon replacement. Incus writes its
+daemon and instance logs under `/var/log/incus`; routing daemon stdout and
+stderr through conmon adds a pipe that long-lived LXC monitor processes can
+inherit. Without this setting, the old conmon can remain alive after the
+Podman container has been replaced, waiting for a still-running guest to close
+that inherited logging file descriptor.
 
 `INCUS_SOCKET_GID` 必须替换为宿主机 `incus-admin` 组的数字 GID，可用
 `getent group incus-admin | cut -d: -f3` 查询。镜像会用相同 GID 创建容器内
